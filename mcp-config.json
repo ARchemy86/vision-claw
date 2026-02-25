@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "vision-claw": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-e", "VISION_API_KEY",
+        "-p", "8080:8080",
+        "vision-claw:latest"
+      ],
+      "env": {
+        "VISION_API_KEY": "your-api-key-here"
+      }
+    },
+    "clip": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "-p", "8081:8080", "clip-vit-base-patch32:latest"]
+    },
+    "yolo": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "-p", "8082:8080", "ultralytics/yolov8:latest"]
+    }
+  }
+}

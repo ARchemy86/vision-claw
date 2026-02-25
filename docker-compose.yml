@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  vision-api:
+    build: ./api
+    container_name: vision-claw-api
+    ports:
+      - "8080:8080"
+    environment:
+      - VISION_MODEL=clip
+      - CONFIDENCE_THRESHOLD=0.7
+      - MAX_IMAGE_SIZE=4096
+    volumes:
+      - vision-models:/app/models
+      - vision-cache:/app/cache
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  clip-model:
+    image: clip-vit-base-patch32:latest
+    container_name: vision-claw-clip
+    ports:
+      - "8081:8080"
+    volumes:
+      - vision-models:/models
+    environment:
+      - MODEL_NAME=ViT-B/32
+    restart: unless-stopped
+
+  yolo-detector:
+    image: ultralytics/yolov8:latest
+    container_name: vision-claw-yolo
+    ports:
+      - "8082:8080"
+    volumes:
+      - vision-models:/models
+    environment:
+      - MODEL=yolov8n.pt
+    restart: unless-stopped
+
+  ocr-service:
+    image: paddlepaddle/paddleocr:latest
+    container_name: vision-claw-ocr
+    ports:
+      - "8083:8080"
+    environment:
+      - OCR_LANG=en
+    restart: unless-stopped
+
+  face-recognition:
+    image: ageitgey/face_recognition:latest
+    container_name: vision-claw-face
+    ports:
+      - "8084:8080"
+    restart: unless-stopped
+
+  # Optional: Web UI
+  vision-ui:
+    image: nginx:alpine
+    container_name: vision-claw-ui
+    ports:
+      - "8090:80"
+    volumes:
+      - ./ui:/usr/share/nginx/html:ro
+    depends_on:
+      - vision-api
+    restart: unless-stopped
+
+volumes:
+  vision-models:
+    driver: local
+  vision-cache:
+    driver: local
+
+networks:
+  default:
+    driver: bridge
