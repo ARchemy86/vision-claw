@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  # Main Compliance API
+  compliance-api:
+    image: python:3.11-slim
+    container_name: vision-claw-compliance-api
+    build:
+      context: ./api
+      dockerfile: Dockerfile.compliance
+    ports:
+      - "8090:8090"
+    environment:
+      - COMPLIANCE_MODE=construction
+      - TOLERANCE_PERCENT=5
+      - OCR_ENGINE_PORT=8091
+      - VISION_PORT=8092
+      - DIFF_PORT=8093
+      - RAG_PORT=8094
+      - PINECONE_HOST=compliance-db
+    volumes:
+      - compliance-data:/data
+      - spec-cache:/cache
+    depends_on:
+      - compliance-db
+      - ocr-engine
+      - vision-analyzer
+      - document-diff
+      - rag-embedding
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 30s
+
+  # OCR for Drawings/Specs
+  ocr-engine:
+    image: paddlepaddle/paddleocr:latest
+    container_name: vision-claw-ocr
+    ports:
+      - "8091:8090"
+    environment:
+      - OCR_LANG=en
+      - STRUCTURED_OUTPUT=true
+    volumes:
+      - compliance-data:/data
+    restart: unless-stopped
+
+  # Vision Analysis (CLIP)
+  vision-analyzer:
+    image: clip-vit-base-patch32:latest
+    container_name: vision-claw-vision
+    ports:
+      - "8092:8090"
+    environment:
+      - MODEL=ViT-B/32
+      - ENABLE_COMPARISON=true
+    volumes:
+      - compliance-data:/data
+    restart: unless-stopped
+
+  # Document Different (diff tool)
+  document-diff:
+    image: python:3.11-slim
+    container_name: vision-claw-diff
+    build:
+      context: ./diff
+    ports:
+      - "8093:8090"
+    environment:
+      - DIFF_ALGORITHM=semantic
+      - IGNORE_FORMATTING=true
+    volumes:
+      - compliance-data:/data
+    restart: unless-stopped
+
+  # RAG + Vector Search
+  rag-embedding:
+    image: text-embedding-3-small:latest
+    container_name: vision-claw-rag
+    ports:
+      - "8094:8090"
+    environment:
+      - EMBEDDING_MODEL=text-embedding-3-small
+      - CHUNK_SIZE=512
+      - CHUNK_OVERLAP=50
+    depends_on:
+      - compliance-db
+    restart: unless-stopped
+
+  # Vector Database (Pinecone local)
+  compliance-db:
+    image: ghcr.io/pinecone-io/pinecone-local:latest
+    container_name: vision-claw-db
+    ports:
+      - "8095:8090"
+    volumes:
+      - compliance-db:/data
+    environment:
+      - PINECONE_INDEX=compliance-docs
+      - DIMENSION=1536
+    restart: unless-stopped
+
+  # Document Processor (conversion)
+  document-processor:
+    image: gotenberg/gotenberg:8
+    container_name: vision-claw-processor
+    ports:
+      - "8096:3000"
+    command:
+      - "gotenberg"
+      - "--api-port=3000"
+      - "--uno-listener-restart-threshold=0"
+    restart: unless-stopped
+
+  # Web UI for Compliance
+  compliance-ui:
+    image: nginx:alpine
+    container_name: vision-claw-ui
+    ports:
+      - "8097:80"
+    volumes:
+      - ./ui:/usr/share/nginx/html:ro
+    depends_on:
+      - compliance-api
+    restart: unless-stopped
+
+volumes:
+  compliance-data:
+    driver: local
+  compliance-db:
+    driver: local
+  spec-cache:
+    driver: local
+
+networks:
+  default:
+    driver: bridge

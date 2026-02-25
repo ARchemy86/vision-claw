@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "vision-claw-compliance": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-e", "COMPLIANCE_MODE=construction",
+        "-e", "TOLERANCE_PERCENT=5",
+        "-p", "8090:8090",
+        "vision-claw-compliance:latest"
+      ],
+      "env": {
+        "COMPLIANCE_API_KEY": "compliance-secret-key"
+      }
+    },
+    "compliance-ocr": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "-p", "8091:8090", "paddleocr:latest"]
+    },
+    "compliance-diff": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "-p", "8093:8090", "document-diff:latest"]
+    },
+    "compliance-rag": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "-p", "8094:8090", "text-embedding:latest"]
+    }
+  }
+}
